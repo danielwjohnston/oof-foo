@@ -2,10 +2,40 @@
 
 **From "oof" to "phew!" - System maintenance made easy**
 
-![Version](https://img.shields.io/badge/version-0.1.0-brightgreen)
+![Version](https://img.shields.io/badge/version-0.2.0--dev-yellow)
+![Status](https://img.shields.io/badge/status-alpha-orange)
 ![Platform](https://img.shields.io/badge/platform-Windows-blue)
 ![PowerShell](https://img.shields.io/badge/PowerShell-5.1+-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
+
+> ⚠️ **ALPHA SOFTWARE**: oof-foo is under active development. Core functionality works but GUI may freeze during operations. Not recommended for production use yet.
+
+---
+
+## Development Status
+
+**Current Version:** 0.2.0-dev (Alpha)
+
+**What Works:**
+- ✅ Command-line maintenance operations
+- ✅ Actual Windows Update installation (via PSWindowsUpdate)
+- ✅ winget and Chocolatey package upgrades
+- ✅ Comprehensive logging system
+- ✅ Configuration file support
+- ✅ System restore point creation
+- ✅ Temp file cleanup, cache clearing
+- ✅ Windows Error Reports cleanup
+- ✅ DISM-based delivery optimization cleanup
+- ✅ System health reporting
+
+**Known Limitations:**
+- ⚠️ GUI freezes during long operations (async runspaces not yet implemented)
+- ⚠️ GUI is basic and needs UX improvements
+- ⚠️ Scheduled task creation not automated (manual setup required)
+- ⚠️ No installer package (manual module import needed)
+- ⚠️ Limited test coverage
+
+**Roadmap:** See [CHANGELOG.md](CHANGELOG.md) for detailed version history and upcoming features.
 
 ---
 
@@ -24,10 +54,11 @@
 ## Features
 
 ### System Updates
-- Windows Update management
-- winget package updates
-- Chocolatey package updates (if installed)
-- Automatic update scheduling
+- Windows Update management (requires PSWindowsUpdate module)
+- winget package upgrades
+- Chocolatey package upgrades (if installed)
+- Download-only mode available
+- Internet connectivity checking
 
 ### Security & Patching
 - Security patch prioritization
@@ -50,11 +81,10 @@
 - Comprehensive health reports
 
 ### User Interface
-- Modern Windows Forms GUI
-- Easy-to-use dashboard
-- One-click full maintenance
-- Individual task controls
-- Real-time status updates
+- Basic Windows Forms GUI
+- Dashboard with quick actions
+- Health check display
+- ⚠️ **Note:** GUI currently freezes during operations (will be fixed in next release)
 
 ---
 

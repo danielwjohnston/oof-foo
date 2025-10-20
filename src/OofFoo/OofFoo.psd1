@@ -3,7 +3,7 @@
     RootModule = 'OofFoo.psm1'
 
     # Version number of this module
-    ModuleVersion = '0.1.0'
+    ModuleVersion = '0.2.0'
 
     # ID used to uniquely identify this module
     GUID = '00ff0000-00ff-00ff-00ff-000000000000'
@@ -25,11 +25,28 @@
 
     # Functions to export from this module
     FunctionsToExport = @(
+        # GUI and Main Functions
         'Start-OofFooGUI',
+        # Core Operations
         'Invoke-SystemUpdate',
         'Invoke-SystemMaintenance',
         'Invoke-SystemPatch',
-        'Get-SystemHealth'
+        'Get-SystemHealth',
+        # Configuration
+        'Get-OofFooConfig',
+        'Set-OofFooConfig',
+        'Get-OofFooConfigPath',
+        # Logging
+        'Write-OofFooLog',
+        'Get-OofFooLogs',
+        'Get-OofFooLogPath',
+        # System Helpers
+        'Test-OofFooAdministrator',
+        'Start-OofFooElevated',
+        'New-OofFooRestorePoint',
+        'Get-OofFooFreeSpace',
+        'Test-OofFooOnline',
+        'ConvertTo-OofFooReadableSize'
     )
 
     # Cmdlets to export from this module
@@ -54,7 +71,21 @@
             ProjectUri = 'https://oof.foo'
 
             # ReleaseNotes of this module
-            ReleaseNotes = 'Initial development version - GUI-based Windows maintenance tool'
+            ReleaseNotes = @'
+v0.2.0 - Major improvements:
+- Added comprehensive logging system
+- Added configuration file support
+- Implemented actual Windows Update installation
+- Implemented actual winget/Chocolatey upgrades
+- Added system restore point creation
+- Added confirmation dialogs for destructive operations
+- Improved error handling throughout
+- Added PSScriptAnalyzer to build process
+- Added GitHub Actions CI/CD pipeline
+- Much more robust and production-ready CLI operations
+
+Note: GUI still freezes during operations (async support pending)
+'@
         }
     }
 }
