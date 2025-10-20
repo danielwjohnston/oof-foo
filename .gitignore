@@ -1,0 +1,38 @@
+# PowerShell
+*.ps1xml
+*.psm1.bak
+*.psd1.bak
+
+# Build artifacts
+build/output/
+build/temp/
+*.zip
+*.msi
+*.exe
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# OS
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Test results
+TestResults/
+*.trx
+coverage/
+
+# Temp files
+temp/
+tmp/
+*.tmp
