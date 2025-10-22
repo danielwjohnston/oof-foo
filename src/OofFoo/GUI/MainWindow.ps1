@@ -1,10 +1,11 @@
 function Start-OofFooGUI {
     <#
     .SYNOPSIS
-        Launches the oof-foo GUI application
+        Launches the oof-foo GUI application with async operations
 
     .DESCRIPTION
         Starts the main Windows Forms GUI for the oof-foo system maintenance tool.
+        Uses PowerShell runspaces for async operations to prevent UI freezing.
         From "oof" to "phew" in one click!
 
     .EXAMPLE
@@ -18,23 +19,32 @@ function Start-OofFooGUI {
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -AssemblyName System.Drawing
 
+    # Get module path for async operations
+    $modulePath = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+
+    # Initialize runspace pool for async operations
+    $script:runspacePool = [runspacefactory]::CreateRunspacePool(1, 5)
+    $script:runspacePool.ApartmentState = "STA"
+    $script:runspacePool.Open()
+    $script:activeJobs = @{}
+
     # Create main form
     $form = New-Object System.Windows.Forms.Form
-    $form.Text = "oof-foo - System Maintenance Tool"
-    $form.Size = New-Object System.Drawing.Size(800, 600)
+    $form.Text = "oof-foo - System Maintenance Tool v0.2.0"
+    $form.Size = New-Object System.Drawing.Size(900, 700)
     $form.StartPosition = "CenterScreen"
     $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
     $form.MaximizeBox = $false
     $form.BackColor = [System.Drawing.Color]::FromArgb(240, 240, 240)
 
-    # Create header panel with branding
+    # Create header panel
     $headerPanel = New-Object System.Windows.Forms.Panel
     $headerPanel.Location = New-Object System.Drawing.Point(0, 0)
-    $headerPanel.Size = New-Object System.Drawing.Size(800, 80)
-    $headerPanel.BackColor = [System.Drawing.Color]::FromArgb(0, 255, 0)  # 00FF00 - bright green
+    $headerPanel.Size = New-Object System.Drawing.Size(900, 80)
+    $headerPanel.BackColor = [System.Drawing.Color]::FromArgb(0, 255, 0)
     $form.Controls.Add($headerPanel)
 
-    # Logo/Title label
+    # Title
     $titleLabel = New-Object System.Windows.Forms.Label
     $titleLabel.Text = "oof-foo"
     $titleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 28, [System.Drawing.FontStyle]::Bold)
@@ -44,9 +54,9 @@ function Start-OofFooGUI {
     $titleLabel.ForeColor = [System.Drawing.Color]::FromArgb(40, 40, 40)
     $headerPanel.Controls.Add($titleLabel)
 
-    # Subtitle label
+    # Subtitle
     $subtitleLabel = New-Object System.Windows.Forms.Label
-    $subtitleLabel.Text = "From 'oof' to 'phew!' - System maintenance made easy"
+    $subtitleLabel.Text = "From 'oof' to 'phew!' - Async operations, no freezing!"
     $subtitleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9)
     $subtitleLabel.Location = New-Object System.Drawing.Point(25, 55)
     $subtitleLabel.AutoSize = $true
@@ -54,136 +64,304 @@ function Start-OofFooGUI {
     $subtitleLabel.ForeColor = [System.Drawing.Color]::FromArgb(60, 60, 60)
     $headerPanel.Controls.Add($subtitleLabel)
 
-    # Create tab control
+    # Tab control
     $tabControl = New-Object System.Windows.Forms.TabControl
     $tabControl.Location = New-Object System.Drawing.Point(10, 90)
-    $tabControl.Size = New-Object System.Drawing.Size(765, 420)
+    $tabControl.Size = New-Object System.Drawing.Size(865, 520)
     $form.Controls.Add($tabControl)
 
-    # ===== DASHBOARD TAB =====
+    # Dashboard tab
     $dashboardTab = New-Object System.Windows.Forms.TabPage
     $dashboardTab.Text = "Dashboard"
     $tabControl.TabPages.Add($dashboardTab)
 
-    # System status group
+    # Status group
     $statusGroup = New-Object System.Windows.Forms.GroupBox
-    $statusGroup.Text = "System Status"
+    $statusGroup.Text = "Operation Output"
     $statusGroup.Location = New-Object System.Drawing.Point(10, 10)
-    $statusGroup.Size = New-Object System.Drawing.Size(730, 150)
+    $statusGroup.Size = New-Object System.Drawing.Size(830, 180)
     $dashboardTab.Controls.Add($statusGroup)
 
-    $statusLabel = New-Object System.Windows.Forms.Label
-    $statusLabel.Text = "System health: Checking..."
-    $statusLabel.Location = New-Object System.Drawing.Point(15, 25)
-    $statusLabel.Size = New-Object System.Drawing.Size(700, 110)
-    $statusLabel.Font = New-Object System.Drawing.Font("Consolas", 9)
-    $statusGroup.Controls.Add($statusLabel)
+    # Status text
+    $statusText = New-Object System.Windows.Forms.TextBox
+    $statusText.Multiline = $true
+    $statusText.ReadOnly = $true
+    $statusText.ScrollBars = [System.Windows.Forms.ScrollBars]::Vertical
+    $statusText.Location = New-Object System.Drawing.Point(15, 25)
+    $statusText.Size = New-Object System.Drawing.Size(800, 140)
+    $statusText.Font = New-Object System.Drawing.Font("Consolas", 9)
+    $statusText.Text = "Ready. Operations run in background - no freezing!`r`nClick any button to start."
+    $statusGroup.Controls.Add($statusText)
 
-    # Quick actions group
+    # Progress bar
+    $progressBar = New-Object System.Windows.Forms.ProgressBar
+    $progressBar.Location = New-Object System.Drawing.Point(25, 200)
+    $progressBar.Size = New-Object System.Drawing.Size(810, 25)
+    $progressBar.Visible = $false
+    $dashboardTab.Controls.Add($progressBar)
+
+    # Progress label
+    $progressLabel = New-Object System.Windows.Forms.Label
+    $progressLabel.Location = New-Object System.Drawing.Point(25, 230)
+    $progressLabel.Size = New-Object System.Drawing.Size(810, 20)
+    $progressLabel.Text = ""
+    $progressLabel.Visible = $false
+    $dashboardTab.Controls.Add($progressLabel)
+
+    # Actions group
     $actionsGroup = New-Object System.Windows.Forms.GroupBox
     $actionsGroup.Text = "Quick Actions"
-    $actionsGroup.Location = New-Object System.Drawing.Point(10, 170)
-    $actionsGroup.Size = New-Object System.Drawing.Size(730, 210)
+    $actionsGroup.Location = New-Object System.Drawing.Point(10, 260)
+    $actionsGroup.Size = New-Object System.Drawing.Size(830, 220)
     $dashboardTab.Controls.Add($actionsGroup)
 
-    # Run All button
-    $runAllBtn = New-Object System.Windows.Forms.Button
-    $runAllBtn.Text = "Run Full Maintenance"
-    $runAllBtn.Location = New-Object System.Drawing.Point(20, 30)
-    $runAllBtn.Size = New-Object System.Drawing.Size(200, 50)
-    $runAllBtn.Font = New-Object System.Drawing.Font("Segoe UI", 11, [System.Drawing.FontStyle]::Bold)
-    $runAllBtn.BackColor = [System.Drawing.Color]::FromArgb(0, 200, 0)
-    $runAllBtn.ForeColor = [System.Drawing.Color]::White
-    $runAllBtn.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    $runAllBtn.Add_Click({
-        $statusLabel.Text = "Running full maintenance...`nThis may take several minutes."
-        $form.Refresh()
-        # TODO: Implement full maintenance
-        [System.Windows.Forms.MessageBox]::Show("Full maintenance completed!", "Success", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+    # Timer for checking async jobs
+    $timer = New-Object System.Windows.Forms.Timer
+    $timer.Interval = 500
+    $timer.Add_Tick({
+        $completedJobs = @()
+
+        foreach ($jobId in @($script:activeJobs.Keys)) {
+            $job = $script:activeJobs[$jobId]
+
+            if ($job.Handle.IsCompleted) {
+                try {
+                    $result = $job.Runspace.EndInvoke($job.Handle)
+                    $duration = ((Get-Date) - $job.StartTime).TotalSeconds
+
+                    $job.StatusTextBox.Text = "✓ Completed in $([math]::Round($duration, 1))s`r`n`r`n"
+
+                    if ($result) {
+                        if ($result -is [string]) {
+                            $job.StatusTextBox.AppendText($result)
+                        } else {
+                            $job.StatusTextBox.AppendText(($result | Out-String))
+                        }
+                    }
+
+                    $job.ProgressLabel.Text = "Completed!"
+                }
+                catch {
+                    $errorMsg = $_.Exception.Message
+                    $job.StatusTextBox.Text = "✗ Error: $errorMsg`r`n"
+                    $job.ProgressLabel.Text = "Error occurred"
+                }
+                finally {
+                    if ($job.Runspace) {
+                        $job.Runspace.Dispose()
+                    }
+                    $job.ProgressBar.Visible = $false
+                    $job.ProgressLabel.Visible = $false
+                    $job.Button.Enabled = $true
+
+                    $completedJobs += $jobId
+                }
+            }
+        }
+
+        foreach ($jobId in $completedJobs) {
+            $script:activeJobs.Remove($jobId)
+        }
     })
-    $actionsGroup.Controls.Add($runAllBtn)
+    $timer.Start()
 
-    # Individual action buttons
-    $updateBtn = New-Object System.Windows.Forms.Button
-    $updateBtn.Text = "Updates Only"
-    $updateBtn.Location = New-Object System.Drawing.Point(20, 90)
-    $updateBtn.Size = New-Object System.Drawing.Size(150, 35)
-    $actionsGroup.Controls.Add($updateBtn)
+    # Helper to run async
+    $runAsync = {
+        param($ScriptBlock, $StatusTextBox, $ProgressBar, $ProgressLabel, $Button, $ModulePath)
 
-    $patchBtn = New-Object System.Windows.Forms.Button
-    $patchBtn.Text = "Security Patches"
-    $patchBtn.Location = New-Object System.Drawing.Point(180, 90)
-    $patchBtn.Size = New-Object System.Drawing.Size(150, 35)
-    $actionsGroup.Controls.Add($patchBtn)
+        $Button.Enabled = $false
+        $ProgressBar.Visible = $true
+        $ProgressBar.Style = [System.Windows.Forms.ProgressBarStyle]::Marquee
+        $ProgressLabel.Visible = $true
+        $ProgressLabel.Text = "Working..."
+        $StatusTextBox.Text = "Starting operation...`r`n"
 
-    $cleanBtn = New-Object System.Windows.Forms.Button
-    $cleanBtn.Text = "System Cleanup"
-    $cleanBtn.Location = New-Object System.Drawing.Point(340, 90)
-    $cleanBtn.Size = New-Object System.Drawing.Size(150, 35)
-    $actionsGroup.Controls.Add($cleanBtn)
+        $runspace = [powershell]::Create()
+        $runspace.RunspacePool = $script:runspacePool
 
+        [void]$runspace.AddScript("Import-Module '$ModulePath\src\OofFoo\OofFoo.psd1' -Force")
+        [void]$runspace.AddScript($ScriptBlock)
+
+        $handle = $runspace.BeginInvoke()
+
+        $jobId = [guid]::NewGuid().ToString()
+        $script:activeJobs[$jobId] = @{
+            Runspace = $runspace
+            Handle = $handle
+            StatusTextBox = $StatusTextBox
+            ProgressBar = $ProgressBar
+            ProgressLabel = $ProgressLabel
+            Button = $Button
+            StartTime = Get-Date
+        }
+    }
+
+    # Health Check button
     $healthBtn = New-Object System.Windows.Forms.Button
     $healthBtn.Text = "Health Check"
-    $healthBtn.Location = New-Object System.Drawing.Point(500, 90)
-    $healthBtn.Size = New-Object System.Drawing.Size(150, 35)
+    $healthBtn.Location = New-Object System.Drawing.Point(20, 30)
+    $healthBtn.Size = New-Object System.Drawing.Size(150, 45)
+    $healthBtn.Font = New-Object System.Drawing.Font("Segoe UI", 10)
     $healthBtn.Add_Click({
-        $statusLabel.Text = "Checking system health...`n`nPlease wait..."
-        $form.Refresh()
-
-        # Get system info
-        $os = Get-CimInstance Win32_OperatingSystem
-        $disk = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'"
-        $diskFreeGB = [math]::Round($disk.FreeSpace / 1GB, 2)
-        $diskTotalGB = [math]::Round($disk.Size / 1GB, 2)
-        $diskUsedPercent = [math]::Round((($disk.Size - $disk.FreeSpace) / $disk.Size) * 100, 1)
-
-        $statusText = "System Health Report:`n"
-        $statusText += "─────────────────────────────────`n"
-        $statusText += "OS: $($os.Caption) ($($os.OSArchitecture))`n"
-        $statusText += "Last Boot: $(Get-Date $os.LastBootUpTime -Format 'yyyy-MM-dd HH:mm')`n"
-        $statusText += "Disk C: $diskFreeGB GB free / $diskTotalGB GB total ($diskUsedPercent% used)`n"
-        $statusText += "Memory: $([math]::Round($os.FreePhysicalMemory / 1MB, 2)) GB free`n"
-        $statusText += "─────────────────────────────────`n"
-        $statusText += "Status: " + $(if ($diskUsedPercent -lt 85) { "✓ Healthy" } else { "⚠ Low disk space" })
-
-        $statusLabel.Text = $statusText
+        $script = {
+            $result = Get-SystemHealth
+            $output = "System Health Report:`r`n"
+            $output += "═══════════════════════`r`n"
+            $output += "Overall: $($result.OverallHealth)`r`n`r`n"
+            $output += "System: $($result.System.OS)`r`n"
+            $output += "Uptime: $($result.System.Uptime.Days)d $($result.System.Uptime.Hours)h`r`n`r`n"
+            foreach ($drive in $result.Disk.Drives) {
+                $output += "$($drive.Drive): $($drive.FreeGB)/$($drive.TotalGB) GB ($($drive.UsedPercent)%) [$($drive.Status)]`r`n"
+            }
+            if ($result.Warnings.Count -gt 0) {
+                $output += "`r`nWarnings:`r`n"
+                $result.Warnings | ForEach-Object { $output += "  ⚠ $_`r`n" }
+            }
+            return $output
+        }
+        & $runAsync $script $statusText $progressBar $progressLabel $healthBtn $modulePath
     })
     $actionsGroup.Controls.Add($healthBtn)
 
-    # ===== UPDATES TAB =====
-    $updatesTab = New-Object System.Windows.Forms.TabPage
-    $updatesTab.Text = "Updates"
-    $tabControl.TabPages.Add($updatesTab)
+    # Updates button
+    $updateBtn = New-Object System.Windows.Forms.Button
+    $updateBtn.Text = "Check Updates"
+    $updateBtn.Location = New-Object System.Drawing.Point(180, 30)
+    $updateBtn.Size = New-Object System.Drawing.Size(150, 45)
+    $updateBtn.Font = New-Object System.Drawing.Font("Segoe UI", 10)
+    $updateBtn.Add_Click({
+        $script = {
+            $result = Invoke-SystemUpdate -UpdateType All -DownloadOnly
+            $output = "Update Check Results:`r`n`r`n"
+            if ($result.WindowsUpdate) { $output += "Windows: $($result.WindowsUpdate.Message)`r`n" }
+            if ($result.WinGet) { $output += "WinGet: $($result.WinGet.Message)`r`n" }
+            if ($result.Chocolatey) { $output += "Chocolatey: $($result.Chocolatey.Message)`r`n" }
+            return $output
+        }
+        & $runAsync $script $statusText $progressBar $progressLabel $updateBtn $modulePath
+    })
+    $actionsGroup.Controls.Add($updateBtn)
 
-    $updatesLabel = New-Object System.Windows.Forms.Label
-    $updatesLabel.Text = "Windows Updates, winget packages, and application updates will be managed here."
-    $updatesLabel.Location = New-Object System.Drawing.Point(20, 20)
-    $updatesLabel.Size = New-Object System.Drawing.Size(700, 60)
-    $updatesTab.Controls.Add($updatesLabel)
+    # Maintenance button
+    $maintenanceBtn = New-Object System.Windows.Forms.Button
+    $maintenanceBtn.Text = "System Cleanup"
+    $maintenanceBtn.Location = New-Object System.Drawing.Point(340, 30)
+    $maintenanceBtn.Size = New-Object System.Drawing.Size(150, 45)
+    $maintenanceBtn.Font = New-Object System.Drawing.Font("Segoe UI", 10)
+    $maintenanceBtn.Add_Click({
+        $confirmation = [System.Windows.Forms.MessageBox]::Show(
+            "Clean temp files and caches? This may delete data.",
+            "Confirm",
+            [System.Windows.Forms.MessageBoxButtons]::YesNo,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        )
+        if ($confirmation -eq [System.Windows.Forms.DialogResult]::Yes) {
+            $script = {
+                $result = Invoke-SystemMaintenance -DeepClean -SkipConfirmation
+                $output = "Maintenance Complete!`r`n`r`n"
+                $output += "Space freed: $($result.SpaceFreedMB) MB`r`n"
+                $output += "Operations: $($result.Operations.Count)`r`n"
+                $output += "Errors: $($result.Errors.Count)`r`n`r`n"
+                $result.Operations | ForEach-Object {
+                    $status = if ($_.Success) { "✓" } else { "✗" }
+                    $output += "$status $($_.Name): $($_.Message)`r`n"
+                }
+                return $output
+            }
+            & $runAsync $script $statusText $progressBar $progressLabel $maintenanceBtn $modulePath
+        }
+    })
+    $actionsGroup.Controls.Add($maintenanceBtn)
 
-    # ===== MAINTENANCE TAB =====
-    $maintenanceTab = New-Object System.Windows.Forms.TabPage
-    $maintenanceTab.Text = "Maintenance"
-    $tabControl.TabPages.Add($maintenanceTab)
+    # Full Maintenance button
+    $fullBtn = New-Object System.Windows.Forms.Button
+    $fullBtn.Text = "FULL MAINTENANCE"
+    $fullBtn.Location = New-Object System.Drawing.Point(20, 90)
+    $fullBtn.Size = New-Object System.Drawing.Size(220, 55)
+    $fullBtn.Font = New-Object System.Drawing.Font("Segoe UI", 11, [System.Drawing.FontStyle]::Bold)
+    $fullBtn.BackColor = [System.Drawing.Color]::FromArgb(0, 200, 0)
+    $fullBtn.ForeColor = [System.Drawing.Color]::White
+    $fullBtn.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $fullBtn.Add_Click({
+        $confirmation = [System.Windows.Forms.MessageBox]::Show(
+            "Run full maintenance (updates + cleanup + patches)?`nThis may take 30+ minutes.",
+            "Confirm Full Maintenance",
+            [System.Windows.Forms.MessageBoxButtons]::YesNo,
+            [System.Windows.Forms.MessageBoxIcon]::Question
+        )
+        if ($confirmation -eq [System.Windows.Forms.DialogResult]::Yes) {
+            $script = {
+                $output = "=== FULL MAINTENANCE ===`r`n`r`n"
+                try {
+                    $output += "1. Health Check (Before)...`r`n"
+                    $before = Get-SystemHealth
+                    $output += "   Status: $($before.OverallHealth)`r`n`r`n"
 
-    $maintenanceLabel = New-Object System.Windows.Forms.Label
-    $maintenanceLabel.Text = "Disk cleanup, cache clearing, temp file removal, and other maintenance tasks."
-    $maintenanceLabel.Location = New-Object System.Drawing.Point(20, 20)
-    $maintenanceLabel.Size = New-Object System.Drawing.Size(700, 60)
-    $maintenanceTab.Controls.Add($maintenanceLabel)
+                    $output += "2. System Updates...`r`n"
+                    $updates = Invoke-SystemUpdate -UpdateType All -SkipConfirmation
+                    $output += "   $($updates.WindowsUpdate.Message)`r`n`r`n"
 
-    # ===== SETTINGS TAB =====
-    $settingsTab = New-Object System.Windows.Forms.TabPage
-    $settingsTab.Text = "Settings"
-    $tabControl.TabPages.Add($settingsTab)
+                    $output += "3. Maintenance...`r`n"
+                    $maint = Invoke-SystemMaintenance -DeepClean -SkipConfirmation
+                    $output += "   Freed: $($maint.SpaceFreedMB) MB`r`n`r`n"
 
-    $settingsLabel = New-Object System.Windows.Forms.Label
-    $settingsLabel.Text = "Configure automatic maintenance schedules and notification preferences."
-    $settingsLabel.Location = New-Object System.Drawing.Point(20, 20)
-    $settingsLabel.Size = New-Object System.Drawing.Size(700, 60)
-    $settingsTab.Controls.Add($settingsLabel)
+                    $output += "4. Security Patches...`r`n"
+                    $patch = Invoke-SystemPatch
+                    $output += "   Defender: $($patch.DefenderUpdates)`r`n`r`n"
 
-    # ===== ABOUT TAB =====
+                    $output += "5. Health Check (After)...`r`n"
+                    $after = Get-SystemHealth
+                    $output += "   Status: $($after.OverallHealth)`r`n`r`n"
+
+                    $output += "=== COMPLETE ===`r`n"
+                } catch {
+                    $output += "`r`n✗ ERROR: $_`r`n"
+                }
+                return $output
+            }
+            & $runAsync $script $statusText $progressBar $progressLabel $fullBtn $modulePath
+        }
+    })
+    $actionsGroup.Controls.Add($fullBtn)
+
+    # View Logs button
+    $logsBtn = New-Object System.Windows.Forms.Button
+    $logsBtn.Text = "View Logs"
+    $logsBtn.Location = New-Object System.Drawing.Point(250, 90)
+    $logsBtn.Size = New-Object System.Drawing.Size(120, 40)
+    $logsBtn.Add_Click({
+        try {
+            $logPath = Get-OofFooLogPath
+            if (Test-Path $logPath) {
+                Start-Process notepad.exe $logPath
+            } else {
+                [System.Windows.Forms.MessageBox]::Show("No logs yet.", "Logs")
+            }
+        } catch {
+            [System.Windows.Forms.MessageBox]::Show("Error: $_", "Error")
+        }
+    })
+    $actionsGroup.Controls.Add($logsBtn)
+
+    # Settings button
+    $settingsBtn = New-Object System.Windows.Forms.Button
+    $settingsBtn.Text = "Settings"
+    $settingsBtn.Location = New-Object System.Drawing.Point(380, 90)
+    $settingsBtn.Size = New-Object System.Drawing.Size(110, 40)
+    $settingsBtn.Add_Click({
+        try {
+            $configPath = Get-OofFooConfigPath
+            if (-not (Test-Path $configPath)) {
+                Set-OofFooConfig -Config (Get-OofFooDefaultConfig)
+            }
+            Start-Process notepad.exe $configPath
+        } catch {
+            [System.Windows.Forms.MessageBox]::Show("Error: $_", "Error")
+        }
+    })
+    $actionsGroup.Controls.Add($settingsBtn)
+
+    # About tab
     $aboutTab = New-Object System.Windows.Forms.TabPage
     $aboutTab.Text = "About"
     $tabControl.TabPages.Add($aboutTab)
@@ -191,44 +369,84 @@ function Start-OofFooGUI {
     $aboutText = New-Object System.Windows.Forms.TextBox
     $aboutText.Multiline = $true
     $aboutText.ReadOnly = $true
+    $aboutText.ScrollBars = [System.Windows.Forms.ScrollBars]::Vertical
     $aboutText.Location = New-Object System.Drawing.Point(20, 20)
-    $aboutText.Size = New-Object System.Drawing.Size(710, 360)
+    $aboutText.Size = New-Object System.Drawing.Size(810, 460)
     $aboutText.Font = New-Object System.Drawing.Font("Segoe UI", 10)
     $aboutText.Text = @"
-oof-foo v0.1.0
+oof-foo v0.2.0
 
-All-in-one Windows system maintenance, updating, and patching tool.
-
+All-in-one Windows system maintenance tool.
 From 'oof' to 'phew!' - System maintenance made easy.
 
-
 ABOUT THE NAME:
-• 00FF00 - Bright green (#00FF00), representing system health
-• oof.foo - Simple, catchy, memorable domain
-• 'oof-phew' - The feeling of fixing system problems
+• 00FF00 - Bright green, representing system health
+• oof.foo - Simple, catchy, memorable
+• 'oof-phew' - From problem to solution
 
+NEW IN v0.2.0:
+✓ ASYNC OPERATIONS - No more freezing!
+✓ Comprehensive logging system
+✓ Configuration file support
+✓ Actual Windows Update installation
+✓ System restore point creation
+✓ Confirmation dialogs
+✓ Progress reporting
+✓ Much better error handling
 
 FEATURES:
-• Automated Windows Updates
-• Application updates (winget, chocolatey)
+• Windows Updates (PSWindowsUpdate)
+• winget & Chocolatey package updates
 • Security patching
-• Disk cleanup and optimization
+• Disk cleanup & optimization
 • System health monitoring
-• Scheduled maintenance
+• Comprehensive logging
+• Configurable settings
 
+LOGS & CONFIG:
+Logs: `$env:APPDATA\OofFoo\Logs\
+Config: `$env:APPDATA\OofFoo\config.json
 
 Copyright (c) 2025
 https://oof.foo
 "@
     $aboutTab.Controls.Add($aboutText)
 
-    # Status bar at bottom
+    # Status bar
     $statusBar = New-Object System.Windows.Forms.StatusStrip
     $statusBarLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
-    $statusBarLabel.Text = "Ready | oof.foo"
+    $statusBarLabel.Text = "Ready | oof.foo v0.2.0 | Async GUI - No Freezing!"
     $statusBar.Items.Add($statusBarLabel) | Out-Null
     $form.Controls.Add($statusBar)
 
-    # Show the form
+    # Cleanup on close
+    $form.Add_FormClosing({
+        $timer.Stop()
+        $timer.Dispose()
+
+        if ($script:activeJobs.Count -gt 0) {
+            $result = [System.Windows.Forms.MessageBox]::Show(
+                "Operations running. Force close?",
+                "Confirm",
+                [System.Windows.Forms.MessageBoxButtons]::YesNo,
+                [System.Windows.Forms.MessageBoxIcon]::Warning
+            )
+            if ($result -eq [System.Windows.Forms.DialogResult]::No) {
+                $_.Cancel = $true
+                return
+            }
+        }
+
+        foreach ($job in $script:activeJobs.Values) {
+            try { $job.Runspace.Dispose() } catch {}
+        }
+
+        if ($script:runspacePool) {
+            $script:runspacePool.Close()
+            $script:runspacePool.Dispose()
+        }
+    })
+
+    # Show form
     [void]$form.ShowDialog()
 }

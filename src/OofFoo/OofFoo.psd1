@@ -3,7 +3,7 @@
     RootModule = 'OofFoo.psm1'
 
     # Version number of this module
-    ModuleVersion = '0.2.0'
+    ModuleVersion = '0.3.0'
 
     # ID used to uniquely identify this module
     GUID = '00ff0000-00ff-00ff-00ff-000000000000'
@@ -30,23 +30,32 @@
         # Core Operations
         'Invoke-SystemUpdate',
         'Invoke-SystemMaintenance',
+        'Invoke-AdvancedSystemMaintenance',
         'Invoke-SystemPatch',
         'Get-SystemHealth',
         # Configuration
         'Get-OofFooConfig',
         'Set-OofFooConfig',
         'Get-OofFooConfigPath',
+        'Get-OofFooDefaultConfig',
         # Logging
         'Write-OofFooLog',
         'Get-OofFooLogs',
         'Get-OofFooLogPath',
+        'Remove-OofFooOldLogs',
         # System Helpers
         'Test-OofFooAdministrator',
         'Start-OofFooElevated',
         'New-OofFooRestorePoint',
         'Get-OofFooFreeSpace',
         'Test-OofFooOnline',
-        'ConvertTo-OofFooReadableSize'
+        'ConvertTo-OofFooReadableSize',
+        'Invoke-OofFooWithProgress',
+        # Scheduled Tasks
+        'New-OofFooScheduledTask',
+        'Remove-OofFooScheduledTask',
+        'Get-OofFooScheduledTask',
+        'Test-OofFooScheduledTask'
     )
 
     # Cmdlets to export from this module
@@ -72,6 +81,15 @@
 
             # ReleaseNotes of this module
             ReleaseNotes = @'
+v0.3.0 - GUI Async + Advanced Features:
+- ✨ ASYNC GUI - No more freezing! Uses PowerShell runspaces
+- 🗓️ Scheduled task automation (New-OofFooScheduledTask)
+- 🧹 Advanced cleanup (Windows.old, driver store, thumbnails)
+- 📊 Better progress reporting in GUI
+- 🔧 Improved test coverage (integration tests)
+- 📝 Enhanced documentation
+- 🎨 Better GUI layout and UX
+
 v0.2.0 - Major improvements:
 - Added comprehensive logging system
 - Added configuration file support
@@ -82,9 +100,6 @@ v0.2.0 - Major improvements:
 - Improved error handling throughout
 - Added PSScriptAnalyzer to build process
 - Added GitHub Actions CI/CD pipeline
-- Much more robust and production-ready CLI operations
-
-Note: GUI still freezes during operations (async support pending)
 '@
         }
     }

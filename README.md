@@ -2,21 +2,24 @@
 
 **From "oof" to "phew!" - System maintenance made easy**
 
-![Version](https://img.shields.io/badge/version-0.2.0--dev-yellow)
-![Status](https://img.shields.io/badge/status-alpha-orange)
+![Version](https://img.shields.io/badge/version-0.3.0-brightgreen)
+![Status](https://img.shields.io/badge/status-beta-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows-blue)
 ![PowerShell](https://img.shields.io/badge/PowerShell-5.1+-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-> ⚠️ **ALPHA SOFTWARE**: oof-foo is under active development. Core functionality works but GUI may freeze during operations. Not recommended for production use yet.
+> ✨ **BETA SOFTWARE**: oof-foo is feature-complete with async GUI! Core functionality is solid. Ready for testing in non-critical environments.
 
 ---
 
 ## Development Status
 
-**Current Version:** 0.2.0-dev (Alpha)
+**Current Version:** 0.3.0 (Beta)
 
 **What Works:**
+- ✅ **Async GUI - No freezing!** (PowerShell runspaces)
+- ✅ **Scheduled task automation** (automated maintenance)
+- ✅ **Advanced cleanup** (Windows.old, driver store, thumbnails)
 - ✅ Command-line maintenance operations
 - ✅ Actual Windows Update installation (via PSWindowsUpdate)
 - ✅ winget and Chocolatey package upgrades
@@ -27,13 +30,12 @@
 - ✅ Windows Error Reports cleanup
 - ✅ DISM-based delivery optimization cleanup
 - ✅ System health reporting
+- ✅ Integration test suite
 
 **Known Limitations:**
-- ⚠️ GUI freezes during long operations (async runspaces not yet implemented)
-- ⚠️ GUI is basic and needs UX improvements
-- ⚠️ Scheduled task creation not automated (manual setup required)
-- ⚠️ No installer package (manual module import needed)
-- ⚠️ Limited test coverage
+- ⚠️ No MSI installer yet (planned for v1.0)
+- ⚠️ GUI could use more polish (functional but basic)
+- ⚠️ No telemetry/analytics
 
 **Roadmap:** See [CHANGELOG.md](CHANGELOG.md) for detailed version history and upcoming features.
 

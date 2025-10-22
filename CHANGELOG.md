@@ -77,3 +77,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **v0.1.0** (2025-10-20) - Initial release with basic structure
 - **Unreleased** - Major improvements to logging, configuration, error handling, and actual functionality
+
+## [0.3.0] - 2025-10-22
+
+### Added - GUI Async & Advanced Features
+- **ASYNC GUI OPERATIONS** - Complete rewrite using PowerShell runspaces
+  - No more UI freezing during long operations
+  - Background job execution with timer-based polling
+  - Real-time progress updates
+  - Clean cancellation and resource cleanup
+- **Scheduled Task Automation**
+  - `New-OofFooScheduledTask` - Create automated maintenance tasks
+  - `Remove-OofFooScheduledTask` - Remove scheduled tasks
+  - `Get-OofFooScheduledTask` - Query existing tasks
+  - `Test-OofFooScheduledTask` - Test run tasks immediately
+  - Support for Daily, Weekly, Monthly schedules
+  - Multiple maintenance types (Full, UpdatesOnly, CleanupOnly, HealthCheckOnly)
+  - Run as SYSTEM or current user
+- **Advanced System Maintenance**
+  - `Invoke-AdvancedSystemMaintenance` - Aggressive cleanup operations
+  - Windows.old folder removal (safely with DISM + direct removal)
+  - Driver store orphan cleanup
+  - Thumbnail cache clearing
+  - Windows Installer cache cleanup
+  - DNS cache flushing
+- **Better Testing**
+  - Integration test suite (Integration.Tests.ps1)
+  - Tests for configuration, logging, helpers, health checks
+  - Tests for scheduled task functions
+  - Module integration tests
+
+### Changed
+- GUI completely refactored with runspace pool (5 concurrent operations)
+- GUI now shows operation duration after completion
+- Improved GUI layout (900x700, better spacing)
+- Better error handling in GUI operations
+- Status bar now shows version number
+- About tab updated with v0.3.0 features
+
+### Fixed
+- **Critical**: GUI no longer freezes during operations
+- Module loading path issues in async operations
+- Resource cleanup on form close
+- Confirmation dialogs now work properly in GUI
+
+### Technical Details
+- Added runspace pool with STA apartment state
+- Timer-based job completion checking (500ms interval)
+- Proper runspace disposal and cleanup
+- Module path resolution for async contexts
+- Scheduled task script generation and storage
+
+## [0.2.0] - 2025-10-20
+
+(See earlier entries above)

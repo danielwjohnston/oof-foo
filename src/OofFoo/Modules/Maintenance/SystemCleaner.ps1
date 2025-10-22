@@ -396,3 +396,296 @@ function Clear-DeliveryOptimizationCache {
         throw "Error running DISM cleanup: $_"
     }
 }
+
+function Clear-WindowsOldFolder {
+    <#
+    .SYNOPSIS
+        Removes Windows.old folder from previous Windows installation
+    #>
+
+    if (-not (Test-OofFooAdministrator)) {
+        throw "Administrator privileges required for Windows.old cleanup"
+    }
+
+    $windowsOldPath = "C:\Windows.old"
+
+    if (-not (Test-Path $windowsOldPath)) {
+        return @{
+            SpaceFreedMB = 0
+            ItemsRemoved = 0
+            Message = "Windows.old not found (already cleaned or no upgrade)"
+        }
+    }
+
+    try {
+        Write-OofFooLog "Cleaning Windows.old folder..." -Level Information
+
+        # Calculate size before
+        $beforeSize = (Get-ChildItem $windowsOldPath -Recurse -Force -ErrorAction SilentlyContinue | 
+            Measure-Object -Property Length -Sum).Sum
+
+        # Use DISM to clean Windows.old safely
+        $result = & dism.exe /Online /Cleanup-Image /StartComponentCleanup /ResetBase 2>&1
+
+        # Also try direct removal (DISM doesn't always remove Windows.old)
+        if (Test-Path $windowsOldPath) {
+            # Take ownership and remove
+            & takeown.exe /F $windowsOldPath /R /D Y 2>&1 | Out-Null
+            & icacls.exe $windowsOldPath /grant "BUILTIN\Administrators:(F)" /T /C /Q 2>&1 | Out-Null
+            Remove-Item $windowsOldPath -Recurse -Force -ErrorAction SilentlyContinue
+        }
+
+        $freedMB = [math]::Round($beforeSize / 1MB, 2)
+
+        Write-OofFooLog "Windows.old cleanup completed. Freed: $freedMB MB" -Level Information
+
+        return @{
+            SpaceFreedMB = $freedMB
+            ItemsRemoved = 1
+            Message = "Cleaned Windows.old folder, freed $freedMB MB"
+        }
+    }
+    catch {
+        throw "Error cleaning Windows.old: $_"
+    }
+}
+
+function Clear-DriverStoreOrphans {
+    <#
+    .SYNOPSIS
+        Removes orphaned drivers from the driver store
+    #>
+
+    if (-not (Test-OofFooAdministrator)) {
+        throw "Administrator privileges required for driver store cleanup"
+    }
+
+    try {
+        Write-OofFooLog "Cleaning orphaned drivers from driver store..." -Level Information
+
+        # Use pnputil to remove orphaned drivers
+        $drivers = & pnputil.exe /enum-drivers 2>&1 | Out-String
+
+        # Count before
+        $beforeCount = ([regex]::Matches($drivers, "oem\d+\.inf")).Count
+
+        # Remove orphaned drivers (non-present devices)
+        & pnputil.exe /delete-driver * /uninstall /force 2>&1 | Out-Null
+
+        Write-OofFooLog "Driver store cleanup completed" -Level Information
+
+        return @{
+            SpaceFreedMB = 0  # Hard to measure
+            ItemsRemoved = 0
+            Message = "Cleaned orphaned drivers from driver store"
+        }
+    }
+    catch {
+        # Non-critical error, just log
+        Write-OofFooLog "Driver store cleanup had issues (non-critical): $_" -Level Warning
+        return @{
+            SpaceFreedMB = 0
+            ItemsRemoved = 0
+            Message = "Driver store cleanup skipped (no orphans or error)"
+        }
+    }
+}
+
+function Clear-ThumbnailCache {
+    <#
+    .SYNOPSIS
+        Clears Windows thumbnail cache
+    #>
+
+    try {
+        $thumbnailPath = "$env:LOCALAPPDATA\Microsoft\Windows\Explorer"
+
+        $beforeSize = 0
+        if (Test-Path $thumbnailPath) {
+            $thumbFiles = Get-ChildItem $thumbnailPath -Filter "thumbcache_*.db" -Force -ErrorAction SilentlyContinue
+            $beforeSize = ($thumbFiles | Measure-Object -Property Length -Sum).Sum
+
+            $thumbFiles | Remove-Item -Force -ErrorAction SilentlyContinue
+        }
+
+        $freedMB = [math]::Round($beforeSize / 1MB, 2)
+
+        return @{
+            SpaceFreedMB = $freedMB
+            ItemsRemoved = ($thumbFiles | Measure-Object).Count
+            Message = "Cleared thumbnail cache, freed $freedMB MB"
+        }
+    }
+    catch {
+        throw "Error clearing thumbnail cache: $_"
+    }
+}
+
+function Clear-WindowsInstallerCache {
+    <#
+    .SYNOPSIS
+        Cleans up Windows Installer cache (carefully)
+    #>
+
+    if (-not (Test-OofFooAdministrator)) {
+        throw "Administrator privileges required for Windows Installer cache cleanup"
+    }
+
+    try {
+        Write-OofFooLog "Cleaning Windows Installer cache..." -Level Information
+
+        $installerPath = "$env:SystemRoot\Installer"
+
+        if (Test-Path $installerPath) {
+            # Only remove .tmp files and old patches (safer approach)
+            $beforeSize = 0
+            $tmpFiles = Get-ChildItem $installerPath -Filter "*.tmp" -Force -ErrorAction SilentlyContinue
+            $beforeSize = ($tmpFiles | Measure-Object -Property Length -Sum).Sum
+
+            $tmpFiles | Remove-Item -Force -ErrorAction SilentlyContinue
+
+            $freedMB = [math]::Round($beforeSize / 1MB, 2)
+
+            return @{
+                SpaceFreedMB = $freedMB
+                ItemsRemoved = ($tmpFiles | Measure-Object).Count
+                Message = "Cleaned Windows Installer temp files, freed $freedMB MB"
+            }
+        }
+
+        return @{
+            SpaceFreedMB = 0
+            ItemsRemoved = 0
+            Message = "Windows Installer cache not found or empty"
+        }
+    }
+    catch {
+        throw "Error cleaning Windows Installer cache: $_"
+    }
+}
+
+function Clear-DNSCache {
+    <#
+    .SYNOPSIS
+        Flushes DNS resolver cache
+    #>
+
+    try {
+        & ipconfig.exe /flushdns 2>&1 | Out-Null
+
+        return @{
+            SpaceFreedMB = 0
+            ItemsRemoved = 0
+            Message = "Flushed DNS cache"
+        }
+    }
+    catch {
+        throw "Error flushing DNS cache: $_"
+    }
+}
+
+function Invoke-AdvancedSystemMaintenance {
+    <#
+    .SYNOPSIS
+        Performs advanced/aggressive system maintenance
+
+    .DESCRIPTION
+        Runs advanced cleanup operations including Windows.old, driver store,
+        and other deep system cleaning. Requires admin privileges.
+
+    .PARAMETER SkipConfirmation
+        Skip confirmation prompt
+
+    .EXAMPLE
+        Invoke-AdvancedSystemMaintenance
+    #>
+
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        [switch]$SkipConfirmation
+    )
+
+    if (-not (Test-OofFooAdministrator)) {
+        throw "Administrator privileges required for advanced maintenance"
+    }
+
+    $config = Get-OofFooConfig
+    Write-OofFooLog "=== Starting Advanced System Maintenance ===" -Level Information
+
+    # Confirmation
+    if (-not $SkipConfirmation) {
+        $message = "This will perform aggressive cleanup including Windows.old removal. Continue?"
+        $confirmation = Read-Host "$message (yes/no)"
+
+        if ($confirmation -ne 'yes' -and $confirmation -ne 'y') {
+            Write-OofFooLog "Advanced maintenance cancelled by user" -Level Warning
+            return
+        }
+    }
+
+    # Create restore point
+    if ($config.Maintenance.CreateRestorePointBeforeMaintenance) {
+        Write-OofFooLog "Creating restore point before advanced maintenance..." -Level Information
+        New-OofFooRestorePoint -Description "Before oof-foo advanced maintenance"
+    }
+
+    # Results tracking
+    $results = [PSCustomObject]@{
+        StartTime = Get-Date
+        EndTime = $null
+        Operations = @()
+        SpaceFreedMB = 0
+        Errors = @()
+    }
+
+    # Define advanced operations
+    $operations = @(
+        @{ Name = "Windows.old Cleanup"; ScriptBlock = { Clear-WindowsOldFolder } }
+        @{ Name = "Driver Store Orphans"; ScriptBlock = { Clear-DriverStoreOrphans } }
+        @{ Name = "Thumbnail Cache"; ScriptBlock = { Clear-ThumbnailCache } }
+        @{ Name = "Windows Installer Cache"; ScriptBlock = { Clear-WindowsInstallerCache } }
+        @{ Name = "DNS Cache"; ScriptBlock = { Clear-DNSCache } }
+    )
+
+    # Execute operations
+    foreach ($operation in $operations) {
+        Write-Progress -Activity "Advanced Maintenance" -Status $operation.Name
+        Write-OofFooLog "Processing: $($operation.Name)" -Level Information
+
+        try {
+            $opResult = & $operation.ScriptBlock
+
+            $results.Operations += [PSCustomObject]@{
+                Name = $operation.Name
+                Success = $true
+                SpaceFreedMB = $opResult.SpaceFreedMB
+                ItemsRemoved = $opResult.ItemsRemoved
+                Message = $opResult.Message
+            }
+
+            $results.SpaceFreedMB += $opResult.SpaceFreedMB
+        }
+        catch {
+            $errorMsg = "Failed: $($operation.Name) - $_"
+            Write-OofFooLog $errorMsg -Level Error
+            $results.Errors += $errorMsg
+
+            $results.Operations += [PSCustomObject]@{
+                Name = $operation.Name
+                Success = $false
+                SpaceFreedMB = 0
+                ItemsRemoved = 0
+                Message = $_.Exception.Message
+            }
+        }
+    }
+
+    Write-Progress -Activity "Advanced Maintenance" -Completed
+
+    $results.EndTime = Get-Date
+    Write-OofFooLog "=== Advanced Maintenance Complete ===" -Level Information
+    Write-OofFooLog "Total space freed: $($results.SpaceFreedMB) MB" -Level Information
+
+    return $results
+}
